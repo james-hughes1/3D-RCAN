@@ -163,7 +163,7 @@ def load_model(filename, input_shape=None):
 
     with h5py.File(filename, mode='r') as f:
         model_config = f.attrs.get('model_config')
-        model_config = json.loads(model_config.decode('utf-8'))
+        model_config = json.loads(model_config)
 
         # overwrite model's input shape
         if input_shape is not None:
@@ -212,8 +212,8 @@ def apply(model, data, overlap_shape=None, verbose=False):
         raise NotImplementedError
 
     image_dim = len(model_input_image_shape)
-    num_input_channels = model.input.shape[-1].value
-    num_output_channels = model.output.shape[-1].value
+    num_input_channels = model.input.shape[-1]
+    num_output_channels = model.output.shape[-1]
 
     scale_factor = tuple(
         fractions.Fraction(o, i) for i, o in zip(

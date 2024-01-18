@@ -13,4 +13,4 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 with warnings.catch_warnings():
     warnings.simplefilter(action='ignore', category=FutureWarning)
     import tensorflow as tf
-    tf.logging.set_verbosity(tf.logging.ERROR)
+    tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
