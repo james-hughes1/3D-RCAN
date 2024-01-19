@@ -3,7 +3,7 @@
 # (CC BY-NC 4.0) https://creativecommons.org/licenses/by-nc/4.0/
 
 import keras
-from keras.utils.conv_utils import normalize_tuple
+from tensorflow.python.keras.utils.conv_utils import normalize_tuple
 import numpy as np
 import warnings
 
