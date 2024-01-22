@@ -196,9 +196,9 @@ training_data = data_gen.flow(*list(zip(*training_data)))
 
 if validation_data is not None:
     validation_data = data_gen.flow(*list(zip(*validation_data)))
-    checkpoint_filepath = 'weights_{epoch:03d}_{val_loss:.8f}.keras'
+    checkpoint_filepath = 'weights_{epoch:03d}_{val_loss:.8f}.hdf5'
 else:
-    checkpoint_filepath = 'weights_{epoch:03d}_{loss:.8f}.keras'
+    checkpoint_filepath = 'weights_{epoch:03d}_{loss:.8f}.hdf5'
 
 steps_per_epoch = config['steps_per_epoch'] // gpus
 validation_steps = None if validation_data is None else steps_per_epoch
