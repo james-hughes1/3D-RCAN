@@ -130,14 +130,14 @@ def get_model_path(directory, model_type='best'):
 
     def get_value(path):
         match = re.match(
-            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.hdf5', path.name)
+            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.keras', path.name)
         if match:
             return float(match.group(2 if model_type == 'best' else 1))
         else:
             return np.inf
 
     try:
-        files = pathlib.Path(directory).glob('*.hdf5')
+        files = pathlib.Path(directory).glob('*.keras')
         return (min if model_type == 'best' else max)(files, key=get_value)
     except ValueError:
         raise RuntimeError(f'Unable to find model file in {directory}')
