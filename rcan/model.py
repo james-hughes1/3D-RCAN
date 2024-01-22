@@ -57,6 +57,15 @@ def _channel_attention_block(x, reduction):
     return keras.layers.Multiply()([x, y])
 
 
+class ScaleLayer(keras.layers.Layer):
+    def __init__(self, scale=1., **kwargs):
+        super().__init__(**kwargs)
+        self.scale = keras.Variable(scale)
+
+    def call(self, inputs):
+        return inputs * self.scale
+
+
 def _residual_channel_attention_blocks(x,
                                        repeat=1,
                                        channel_reduction=8,
@@ -72,28 +81,11 @@ def _residual_channel_attention_blocks(x,
         x = _channel_attention_block(x, channel_reduction)
 
         if residual_scaling != 1.0:
-            x = keras.layers.Lambda(lambda x: residual_scaling * x)(x)
+            x = ScaleLayer(scale=residual_scaling)(x)
 
         x = keras.layers.Add()([x, skip])
 
     return x
-
-
-def _standardize(x):
-    '''
-    Standardize the signal so that the range becomes [-1, 1] (assuming the
-    original range is [0, 1]).
-    '''
-    prefix = 'lambda_standardize'
-    name = prefix + '_' + str(keras.backend.get_uid(prefix))
-    return keras.layers.Lambda(lambda x: 2 * x - 1, name=name)(x)
-
-
-def _destandardize(x):
-    '''Undo standardization'''
-    prefix = 'lambda_destandardize'
-    name = prefix + '_' + str(keras.backend.get_uid(prefix))
-    return keras.layers.Lambda(lambda x: 0.5 * x + 0.5, name=name)(x)
 
 
 def build_rcan(input_shape=(16, 256, 256, 1),
@@ -144,8 +136,7 @@ def build_rcan(input_shape=(16, 256, 256, 1),
 
     inputs = keras.layers.Input(input_shape)
 
-    x = _standardize(inputs)
-    x = _conv(x, num_channels, 3)
+    x = _conv(inputs, num_channels, 3)
 
     long_skip = x
 
@@ -167,7 +158,6 @@ def build_rcan(input_shape=(16, 256, 256, 1),
     x = _conv(x, num_channels, 3)
     x = keras.layers.Add()([x, long_skip])
 
-    x = _conv(x, num_output_channels, 3)
-    outputs = _destandardize(x)
+    outputs = _conv(x, num_output_channels, 3)
 
     return keras.Model(inputs, outputs)
