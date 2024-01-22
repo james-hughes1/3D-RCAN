@@ -1,5 +1,5 @@
 {
-    "epochs": 300,
+    "epochs": 5,
     "steps_per_epoch": 256,
     "num_residual_groups": 3,
     "training_data_dir": {"raw":"Raw/",
