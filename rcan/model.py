@@ -88,6 +88,22 @@ def _residual_channel_attention_blocks(x,
     return x
 
 
+class StandardiseLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, inputs):
+        return 2 * inputs - 1
+
+
+class DestandardiseLayer(keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, inputs):
+        return 0.5 * inputs + 0.5
+
+
 def build_rcan(input_shape=(16, 256, 256, 1),
                *,
                num_channels=32,
@@ -136,7 +152,8 @@ def build_rcan(input_shape=(16, 256, 256, 1),
 
     inputs = keras.layers.Input(input_shape)
 
-    x = _conv(inputs, num_channels, 3)
+    x = StandardiseLayer(inputs)
+    x = _conv(x, num_channels, 3)
 
     long_skip = x
 
@@ -158,6 +175,7 @@ def build_rcan(input_shape=(16, 256, 256, 1),
     x = _conv(x, num_channels, 3)
     x = keras.layers.Add()([x, long_skip])
 
-    outputs = _conv(x, num_output_channels, 3)
+    x = _conv(x, num_output_channels, 3)
+    outputs = DestandardiseLayer(x)
 
     return keras.Model(inputs, outputs)
