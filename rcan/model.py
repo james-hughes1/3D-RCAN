@@ -2,8 +2,8 @@
 # Creative Commons Attribution-NonCommercial 4.0 International Public License
 # (CC BY-NC 4.0) https://creativecommons.org/licenses/by-nc/4.0/
 
+import tensorflow as tf
 import keras
-
 
 def _get_spatial_ndim(x):
     return keras.backend.ndim(x) - 2
@@ -63,7 +63,7 @@ class ScaleLayer(keras.layers.Layer):
         self.scale = keras.Variable(scale)
 
     def call(self, inputs):
-        return inputs * self.scale
+        return tf.multiply(inputs, self.scale)
 
 
 def _residual_channel_attention_blocks(x,
@@ -87,21 +87,28 @@ def _residual_channel_attention_blocks(x,
 
     return x
 
-
+@keras.saving.register_keras_serializable(package="custom", name="Standardise")
 class StandardiseLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def call(self, inputs):
-        return 2 * inputs - 1
+        return tf.math.add(tf.math.scalar_mul(2.0, inputs), -1.0)
+
+    def get_config(self):
+        return {}
 
 
+@keras.saving.register_keras_serializable(package="custom", name="Destandardise")
 class DestandardiseLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
     def call(self, inputs):
-        return 0.5 * inputs + 0.5
+        return tf.math.add(tf.math.scalar_mul(0.5, inputs), 0.5)
+
+    def get_config(self):
+        return {}
 
 
 def build_rcan(input_shape=(16, 256, 256, 1),
@@ -152,7 +159,7 @@ def build_rcan(input_shape=(16, 256, 256, 1),
 
     inputs = keras.layers.Input(input_shape)
 
-    x = StandardiseLayer(inputs)
+    x = StandardiseLayer()(inputs)
     x = _conv(x, num_channels, 3)
 
     long_skip = x
@@ -176,6 +183,6 @@ def build_rcan(input_shape=(16, 256, 256, 1),
     x = keras.layers.Add()([x, long_skip])
 
     x = _conv(x, num_output_channels, 3)
-    outputs = DestandardiseLayer(x)
+    outputs = DestandardiseLayer()(x)
 
     return keras.Model(inputs, outputs)

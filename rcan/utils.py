@@ -15,6 +15,8 @@ import tifffile
 import tqdm
 import tqdm.utils
 
+from .model import StandardiseLayer, DestandardiseLayer
+
 from tensorflow.python.client.device_lib import list_local_devices
 
 
@@ -130,14 +132,14 @@ def get_model_path(directory, model_type='best'):
 
     def get_value(path):
         match = re.match(
-            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.hdf5', path.name)
+            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.keras', path.name)
         if match:
             return float(match.group(2 if model_type == 'best' else 1))
         else:
             return np.inf
 
     try:
-        files = pathlib.Path(directory).glob('*.hdf5')
+        files = pathlib.Path(directory).glob('*.keras')
         return (min if model_type == 'best' else max)(files, key=get_value)
     except ValueError:
         raise RuntimeError(f'Unable to find model file in {directory}')
@@ -161,24 +163,10 @@ def load_model(filename, input_shape=None):
         Keras model instance.
     '''
 
-    with h5py.File(filename, mode='r') as f:
-        model_config = f.attrs.get('model_config')
-        model_config = json.loads(model_config)
-
-        # overwrite model's input shape
-        if input_shape is not None:
-            for layer in model_config['config']['layers']:
-                if layer['class_name'] == 'InputLayer':
-                    shape = layer['config']['batch_input_shape']
-                    if len(shape) - 2 != len(input_shape):
-                        raise ValueError(
-                            f'Input shape must be {len(shape) - 2}D; '
-                            f'Received input shape: {input_shape}')
-                    shape[1:-1] = input_shape
-
-        model = keras.models.model_from_config(model_config)
-        model.load_weights(filename)
-        return model
+    return keras.models.load_model(
+        "custom_model.keras",
+        custom_objects={"Standardise": StandardiseLayer, "Destandardise": DestandardiseLayer}
+    )
 
 
 def apply(model, data, overlap_shape=None, verbose=False):
