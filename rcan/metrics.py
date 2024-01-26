@@ -3,6 +3,7 @@
 # (CC BY-NC 4.0) https://creativecommons.org/licenses/by-nc/4.0/
 
 import keras.backend as K
+import keras
 import tensorflow as tf
 
 
@@ -20,6 +21,9 @@ def _get_gaussian_kernel(dim, size, sigma):
     return kernel
 
 
+@keras.saving.register_keras_serializable(
+    package="custom_metrics", name="psnr"
+)
 def psnr(y_true, y_pred):
     '''
     Computs the peak signal-to-noise ratio between two images. Note that the
@@ -29,6 +33,9 @@ def psnr(y_true, y_pred):
     return -4.342944819 * K.log(K.mean(K.square(p - q), axis=-1))
 
 
+@keras.saving.register_keras_serializable(
+    package="custom_metrics", name="ssim"
+)
 def ssim(y_true, y_pred):
     '''
     Computes the structural similarity index between two images. Note that the

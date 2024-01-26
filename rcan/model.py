@@ -5,6 +5,7 @@
 import tensorflow as tf
 import keras
 
+
 def _get_spatial_ndim(x):
     return keras.backend.ndim(x) - 2
 
@@ -87,7 +88,10 @@ def _residual_channel_attention_blocks(x,
 
     return x
 
-@keras.saving.register_keras_serializable(package="custom", name="Standardise")
+
+@keras.saving.register_keras_serializable(
+    package="custom", name="Standardise"
+)
 class StandardiseLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -99,7 +103,9 @@ class StandardiseLayer(keras.layers.Layer):
         return {}
 
 
-@keras.saving.register_keras_serializable(package="custom", name="Destandardise")
+@keras.saving.register_keras_serializable(
+    package="custom", name="Destandardise"
+)
 class DestandardiseLayer(keras.layers.Layer):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)

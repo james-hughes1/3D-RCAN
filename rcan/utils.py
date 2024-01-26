@@ -3,9 +3,7 @@
 # (CC BY-NC 4.0) https://creativecommons.org/licenses/by-nc/4.0/
 
 import fractions
-import h5py
 import itertools
-import json
 import keras
 import numexpr
 import numpy as np
@@ -16,6 +14,7 @@ import tqdm
 import tqdm.utils
 
 from .model import StandardiseLayer, DestandardiseLayer
+from .metrics import psnr, ssim
 
 from tensorflow.python.client.device_lib import list_local_devices
 
@@ -164,8 +163,13 @@ def load_model(filename, input_shape=None):
     '''
 
     return keras.models.load_model(
-        "custom_model.keras",
-        custom_objects={"Standardise": StandardiseLayer, "Destandardise": DestandardiseLayer}
+        filename,
+        custom_objects={
+            "Standardise": StandardiseLayer,
+            "Destandardise": DestandardiseLayer,
+            "psnr": psnr,
+            "ssim": ssim
+        }
     )
 
 
