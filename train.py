@@ -196,9 +196,9 @@ training_data = data_gen.flow(*list(zip(*training_data)))
 
 if validation_data is not None:
     validation_data = data_gen.flow(*list(zip(*validation_data)))
-    checkpoint_filepath = 'weights_{epoch:03d}_{val_loss:.8f}.hdf5'
+    checkpoint_filepath = 'weights_{epoch:03d}_{val_loss:.8f}.keras'
 else:
-    checkpoint_filepath = 'weights_{epoch:03d}_{loss:.8f}.hdf5'
+    checkpoint_filepath = 'weights_{epoch:03d}_{loss:.8f}.keras'
 
 steps_per_epoch = config['steps_per_epoch'] // gpus
 validation_steps = None if validation_data is None else steps_per_epoch
@@ -221,7 +221,7 @@ model.fit(
             log_dir=str(output_dir),
             write_graph=False),
         tf.keras.callbacks.ModelCheckpoint(
-            output_dir / checkpoint_filepath,
+            str(output_dir / checkpoint_filepath),
             monitor='loss' if validation_data is None else 'val_loss',
             save_best_only=True),
         TqdmCallback()

@@ -86,21 +86,32 @@ def _residual_channel_attention_blocks(x,
     return x
 
 
-def _standardize(x):
-    '''
-    Standardize the signal so that the range becomes [-1, 1] (assuming the
-    original range is [0, 1]).
-    '''
-    prefix = 'lambda_standardize'
-    name = prefix + '_' + str(tf.keras.backend.get_uid(prefix))
-    return tf.keras.layers.Lambda(lambda x: 2 * x - 1, name=name)(x)
+@tf.keras.saving.register_keras_serializable(
+    package='custom', name='Standardise'
+)
+class StandardiseLayer(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, inputs):
+        return tf.math.add(tf.math.scalar_mul(2.0, inputs), -1.0)
+
+    def get_config(self):
+        return {}
 
 
-def _destandardize(x):
-    '''Undo standardization'''
-    prefix = 'lambda_destandardize'
-    name = prefix + '_' + str(tf.keras.backend.get_uid(prefix))
-    return tf.keras.layers.Lambda(lambda x: 0.5 * x + 0.5, name=name)(x)
+@tf.keras.saving.register_keras_serializable(
+    package='custom', name='Destandardise'
+)
+class DestandardiseLayer(tf.keras.layers.Layer):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def call(self, inputs):
+        return tf.math.add(tf.math.scalar_mul(0.5, inputs), 0.5)
+
+    def get_config(self):
+        return {}
 
 
 def build_rcan(input_shape=(16, 256, 256, 1),
@@ -151,7 +162,7 @@ def build_rcan(input_shape=(16, 256, 256, 1),
 
     inputs = tf.keras.layers.Input(input_shape)
 
-    x = _standardize(inputs)
+    x = StandardiseLayer()(inputs)
     x = _conv(x, num_channels, 3)
 
     long_skip = x
@@ -175,6 +186,6 @@ def build_rcan(input_shape=(16, 256, 256, 1),
     x = tf.keras.layers.Add()([x, long_skip])
 
     x = _conv(x, num_output_channels, 3)
-    outputs = _destandardize(x)
+    outputs = DestandardiseLayer()(x)
 
     return tf.keras.Model(inputs, outputs)

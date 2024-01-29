@@ -1,16 +1,8 @@
 {
-    "epochs": 300,
-    "steps_per_epoch": 256,
+    "epochs": 5,
+    "steps_per_epoch": 2,
     "num_residual_groups": 2,
-    "training_data_dir": {"raw":"/path/to/training/Raw/",
-                          "gt":"/path/to/training/GT/"},
-    "training_image_pairs": [
-        {"raw": "/path/to/additional/Raw/image01.tif",
-         "gt": "/path/to/additional/GT/image01.tif"},
-        {"raw": "/path/to/additional/Raw/image02.tif",
-         "gt": "/path/to/additional/GT/image02.tif"}
-    ],
-    "validation_data_dir": {"raw":"/path/to/validation/Raw/",
-                            "gt":"/path/to/validation/GT/"}
+    "training_data_dir": {"raw":"Raw/",
+                          "gt":"GT/"}
 
 }

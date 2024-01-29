@@ -14,9 +14,8 @@ import tensorflow as tf
 import tifffile
 import tqdm
 import tqdm.utils
-
-from keras.saving import hdf5_format
-from keras.saving.saved_model import json_utils
+from .model import StandardiseLayer, DestandardiseLayer
+from .metrics import psnr, ssim
 
 
 def normalize(image, p_min=2, p_max=99.9, dtype='float32'):
@@ -77,14 +76,14 @@ def get_model_path(directory, model_type='best'):
 
     def get_value(path):
         match = re.match(
-            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.hdf5', path.name)
+            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.keras', path.name)
         if match:
             return float(match.group(2 if model_type == 'best' else 1))
         else:
             return np.inf
 
     try:
-        files = pathlib.Path(directory).glob('*.hdf5')
+        files = pathlib.Path(directory).glob('*.keras')
         return (min if model_type == 'best' else max)(files, key=get_value)
     except ValueError:
         raise RuntimeError(f'Unable to find model file in {directory}')
@@ -108,24 +107,15 @@ def load_model(filename, input_shape=None):
         Keras model instance.
     '''
 
-    with h5py.File(filename, mode='r') as f:
-        model_config = json_utils.decode(f.attrs.get('model_config'))
-
-        # overwrite model's input shape
-        if input_shape is not None:
-            for layer in model_config['config']['layers']:
-                if layer['class_name'] == 'InputLayer':
-                    shape = layer['config']['batch_input_shape']
-                    if len(shape) - 2 != len(input_shape):
-                        raise ValueError(
-                            f'Input shape must be {len(shape) - 2}D; '
-                            f'Received input shape: {input_shape}')
-                    shape[1:-1] = input_shape
-
-        model = tf.keras.models.model_from_config(model_config)
-        hdf5_format.load_weights_from_hdf5_group(f['model_weights'], model)
-
-        return model
+    return tf.keras.models.load_model(
+        filename,
+        custom_objects={
+            "Standardise": StandardiseLayer,
+            "Destandardise": DestandardiseLayer,
+            "psnr": psnr,
+            "ssim": ssim
+        }
+    )
 
 
 def apply(model, data, overlap_shape=None, verbose=False):
