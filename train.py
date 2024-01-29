@@ -10,11 +10,9 @@ from rcan.model import build_rcan
 from rcan.utils import (
     convert_to_multi_gpu_model,
     get_gpu_count,
-    normalize,
     staircase_exponential_decay)
 
 import argparse
-import itertools
 import json
 import jsonschema
 import keras
@@ -23,8 +21,10 @@ import pathlib
 import tifffile
 
 
-def load_data(config, data_type):
+def load_data_paths(config, data_type):
     image_pair_list = config.get(data_type + '_image_pairs', [])
+    ndim_list = []
+    input_shape_list = []
 
     if data_type + '_data_dir' in config:
         raw_dir, gt_dir = [
@@ -46,11 +46,9 @@ def load_data(config, data_type):
             image_pair_list.append({'raw': str(raw_file), 'gt': str(gt_file)})
 
     if not image_pair_list:
-        return None
+        return None, None
 
-    print(f'Loading {data_type} data')
-
-    data = []
+    print(f'Verifying {data_type} data')
     for p in image_pair_list:
         raw_file, gt_file = [p[t] for t in ['raw', 'gt']]
 
@@ -58,15 +56,24 @@ def load_data(config, data_type):
         print('    gt:', gt_file)
 
         raw, gt = [tifffile.imread(p[t]) for t in ['raw', 'gt']]
+        ndim_list.append(raw.ndim)
+        input_shape_list.append(raw.shape)
 
         if raw.shape != gt.shape:
             raise ValueError(
                 'Raw and GT images must be the same size: '
                 f'{p["raw"]} {raw.shape} vs. {p["gt"]} {gt.shape}')
+    for ndim in ndim_list:
+        if ndim != ndim_list[0]:
+            raise ValueError(
+                'All images must have the same number of dimensions'
+            )
 
-        data.append([normalize(m) for m in [raw, gt]])
+    min_input_shape = input_shape_list[0]
+    for input_shape in input_shape_list:
+        min_input_shape = np.minimum(min_input_shape, input_shape)
 
-    return data
+    return image_pair_list, min_input_shape
 
 
 parser = argparse.ArgumentParser()
@@ -141,13 +148,13 @@ config.setdefault('initial_learning_rate', 1e-4)
 config.setdefault('loss', 'mae')
 config.setdefault('metrics', ['psnr'])
 
-training_data = load_data(config, 'training')
-validation_data = load_data(config, 'validation')
+training_data, min_input_shape_training = load_data_paths(config, 'training')
+validation_data, min_input_shape_validation = load_data_paths(config, 'validation')
 
-ndim = training_data[0][0].ndim
+ndim = tifffile.imread(training_data[0]['raw']).ndim
 
-for p in itertools.chain(training_data, validation_data or []):
-    if p[0].ndim != ndim:
+if validation_data:
+    if tifffile.imread(validation_data[0]['raw']).ndim != ndim:
         raise ValueError('All images must have the same number of dimensions')
 
 if 'input_shape' in config:
@@ -158,8 +165,9 @@ if 'input_shape' in config:
 else:
     input_shape = (16, 256, 256) if ndim == 3 else (256, 256)
 
-for p in itertools.chain(training_data, validation_data or []):
-    input_shape = np.minimum(input_shape, p[0].shape)
+input_shape = np.minimum(input_shape, min_input_shape_training)
+if validation_data:
+    input_shape = np.minimum(input_shape, min_input_shape_validation)
 
 print('Building RCAN model')
 print('  - input_shape =', input_shape)
@@ -193,10 +201,14 @@ data_gen = DataGenerator(
     intensity_threshold=config['intensity_threshold'],
     area_ratio_threshold=config['area_ratio_threshold'])
 
-training_data = data_gen.flow(*list(zip(*training_data)))
+training_data = data_gen.flow(
+    [p['raw'] for p in training_data], [p['gt'] for p in training_data]
+)
 
 if validation_data is not None:
-    validation_data = data_gen.flow(*list(zip(*validation_data)))
+    validation_data = data_gen.flow(
+        [p['raw'] for p in validation_data], [p['gt'] for p in validation_data]
+    )
     checkpoint_filepath = 'weights_{epoch:03d}_{val_loss:.8f}.keras'
 else:
     checkpoint_filepath = 'weights_{epoch:03d}_{loss:.8f}.keras'

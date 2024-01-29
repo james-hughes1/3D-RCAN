@@ -6,6 +6,8 @@ import keras
 from tensorflow.python.keras.utils.conv_utils import normalize_tuple
 import numpy as np
 import warnings
+import tifffile
+from rcan.utils import normalize
 
 
 class DataGenerator:
@@ -109,6 +111,7 @@ class DataGenerator:
             self._intensity_threshold = intensity_threshold
             self._area_threshold = area_threshold
             self._scale_factor = scale_factor
+            self._shape = shape
 
             for s, f, in zip(shape, self._scale_factor):
                 if f < 0 and s % -f != 0:
@@ -127,47 +130,23 @@ class DataGenerator:
                     'Different number of images are given: '
                     f'{len(self._x)} vs. {len(self._y)}')
 
-            if len({m.dtype for m in self._x}) != 1:
-                raise ValueError('All source images must be the same type')
-            if len({m.dtype for m in self._y}) != 1:
-                raise ValueError('All target images must be the same type')
-
-            for i in range(len(self._x)):
-                if len(self._x[i].shape) == len(shape):
-                    self._x[i] = self._x[i][..., np.newaxis]
-
-                if len(self._y[i].shape) == len(shape):
-                    self._y[i] = self._y[i][..., np.newaxis]
-
-                if len(self._x[i].shape) != len(shape) + 1:
-                    raise ValueError(f'Source image must be {len(shape)}D')
-
-                if len(self._y[i].shape) != len(shape) + 1:
-                    raise ValueError(f'Target image must be {len(shape)}D')
-
-                if self._x[i].shape[:-1] < shape:
-                    raise ValueError(
-                        'Source image must be larger than the patch size')
-
-                expected_y_image_size = self._scale(self._x[i].shape[:-1])
-                if self._y[i].shape[:-1] != expected_y_image_size:
-                    raise ValueError('Invalid target image size: '
-                                     f'expected {expected_y_image_size}, '
-                                     f'but received {self._y[i].shape[:-1]}')
-
-            if len({m.shape[-1] for m in self._x}) != 1:
-                raise ValueError(
-                    'All source images must have the same number of channels')
-            if len({m.shape[-1] for m in self._y}) != 1:
-                raise ValueError(
-                    'All target images must have the same number of channels')
-
+            x_image_0 = tifffile.imread(self._y[0])
+            if len(x_image_0.shape) == len(self._shape):
+                num_channels_x = 1
+            else:
+                num_channels_x = x_image_0.shape[-1]
             self._batch_x = np.zeros(
-                (batch_size, *shape, self._x[0].shape[-1]),
-                dtype=self._x[0].dtype)
+                (batch_size, *shape, num_channels_x),
+                dtype=x_image_0.dtype)
+
+            y_image_0 = tifffile.imread(self._y[0])
+            if len(y_image_0.shape) == len(self._shape):
+                num_channels_y = 1
+            else:
+                num_channels_y = y_image_0.shape[-1]
             self._batch_y = np.zeros(
-                (batch_size, *self._scale(shape), self._y[0].shape[-1]),
-                dtype=self._y[0].dtype)
+                (batch_size, *self._scale(shape), num_channels_y),
+                dtype=y_image_0.dtype)
 
         def __len__(self):
             return 1  # return a dummy value
@@ -180,14 +159,42 @@ class DataGenerator:
                 for _ in range(512):
                     j = np.random.randint(0, len(self._x))
 
+                    x_image_j = normalize(tifffile.imread(self._x[j]))
+                    y_image_j = normalize(tifffile.imread(self._y[j]))
+
+                    if len(x_image_j.shape) == len(self._shape):
+                        x_image_j = x_image_j[..., np.newaxis]
+
+                    if len(y_image_j.shape) == len(self._shape):
+                        y_image_j = y_image_j[..., np.newaxis]
+
+                    if len(x_image_j.shape) != len(self._shape) + 1:
+                        raise ValueError(
+                            f'Source image must be {len(self._shape)}D')
+
+                    if len(y_image_j.shape) != len(self._shape) + 1:
+                        raise ValueError(
+                            f'Target image must be {len(self._shape)}D')
+
+                    if x_image_j.shape[:-1] < self._shape:
+                        raise ValueError(
+                            'Source image must be larger than the patch size')
+
+                    expected_y_image_size = self._scale(x_image_j.shape[:-1])
+                    if y_image_j.shape[:-1] != expected_y_image_size:
+                        raise ValueError('Invalid target image size: '
+                                        f'expected {expected_y_image_size}, '
+                                        f'but received {y_image_j.shape[:-1]}')
+
                     tl = [np.random.randint(0, a - b + 1)
                           for a, b in zip(
-                              self._x[j].shape, self._batch_x.shape[1:])]
-                    x = np.copy(self._x[j][tuple(
+                              x_image_j.shape, self._batch_x.shape[1:])]
+
+                    x = np.copy(x_image_j[tuple(
                         [slice(a, a + b) for a, b in zip(
                             tl, self._batch_x.shape[1:])])])
 
-                    y = np.copy(self._y[j][tuple(
+                    y = np.copy(y_image_j[tuple(
                         [slice(a, a + b) for a, b in zip(
                             self._scale(tl), self._batch_y.shape[1:])])])
 
@@ -200,6 +207,18 @@ class DataGenerator:
                         'Failed to sample a valid patch',
                         RuntimeWarning,
                         stacklevel=3)
+
+            if len({m.shape[-1] for m in self._batch_x}) != 1:
+                raise ValueError(
+                    'All source images must have the same number of channels')
+            if len({m.shape[-1] for m in self._batch_y}) != 1:
+                raise ValueError(
+                    'All target images must have the same number of channels')
+
+            if len({m.dtype for m in self._batch_x}) != 1:
+                raise ValueError('All source images must be the same type')
+            if len({m.dtype for m in self._batch_y}) != 1:
+                raise ValueError('All target images must be the same type')
 
                 self._batch_x[i], self._batch_y[i] = \
                     self._transform_function(x, y)
