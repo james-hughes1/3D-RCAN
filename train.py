@@ -4,7 +4,6 @@
 # (CC BY-NC 4.0) https://creativecommons.org/licenses/by-nc/4.0/
 
 import argparse
-import itertools
 import json
 import jsonschema
 import numpy as np
@@ -99,6 +98,7 @@ schema = {
         'channel_reduction': {'type': 'integer', 'minimum': 1},
         'epochs': {'type': 'integer', 'minimum': 1},
         'steps_per_epoch': {'type': 'integer', 'minimum': 1},
+        'batch_size': {'type': 'integer', 'minimum': 1},
         'data_augmentation': {'type': 'boolean'},
         'intensity_threshold': {'type': 'number'},
         'area_ratio_threshold': {'type': 'number', 'minimum': 0, 'maximum': 1},
@@ -136,6 +136,7 @@ with open(args.config) as f:
 jsonschema.validate(config, schema)
 config.setdefault('epochs', 300)
 config.setdefault('steps_per_epoch', 256)
+config.setdefault('batch_size', 1)
 config.setdefault('num_channels', 32)
 config.setdefault('num_residual_blocks', 3)
 config.setdefault('num_residual_groups', 5)
@@ -147,8 +148,12 @@ config.setdefault('initial_learning_rate', 1e-4)
 config.setdefault('loss', 'mae')
 config.setdefault('metrics', ['psnr'])
 
-training_data, min_input_shape_training = load_data_paths(config, 'training')
-validation_data, min_input_shape_validation = load_data_paths(config, 'validation')
+training_data, min_input_shape_training = load_data_paths(
+    config, 'training'
+)
+validation_data, min_input_shape_validation = load_data_paths(
+    config, 'validation'
+)
 
 ndim = tifffile.imread(training_data[0]['raw']).ndim
 
@@ -176,28 +181,25 @@ for s in ['num_channels',
           'channel_reduction']:
     print(f'  - {s} =', config[s])
 
-strategy = tf.distribute.MirroredStrategy(
-    cross_device_ops=tf.distribute.ReductionToOneDevice())
-gpus = strategy.num_replicas_in_sync
+model = build_rcan(
+    (*input_shape, 1),
+    num_channels=config['num_channels'],
+    num_residual_blocks=config['num_residual_blocks'],
+    num_residual_groups=config['num_residual_groups'],
+    channel_reduction=config['channel_reduction'])
 
-with strategy.scope():
-    model = build_rcan(
-        (*input_shape, 1),
-        num_channels=config['num_channels'],
-        num_residual_blocks=config['num_residual_blocks'],
-        num_residual_groups=config['num_residual_groups'],
-        channel_reduction=config['channel_reduction'])
-
-    model.compile(
-        optimizer=tf.keras.optimizers.Adam(
-            learning_rate=config['initial_learning_rate']),
-        loss={'mae': tf.keras.losses.MeanAbsoluteError(),
-              'mse': tf.keras.losses.MeanSquaredError()}[config['loss']],
-        metrics=[{'psnr': psnr, 'ssim': ssim}[m] for m in config['metrics']])
+model.compile(
+    optimizer=tf.keras.optimizers.Adam(
+        learning_rate=config['initial_learning_rate']),
+    loss={
+        'mae': tf.keras.losses.MeanAbsoluteError(),
+        'mse': tf.keras.losses.MeanSquaredError()
+    }[config['loss']],
+    metrics=[{'psnr': psnr, 'ssim': ssim}[m] for m in config['metrics']])
 
 data_gen = DataGenerator(
     input_shape,
-    gpus,
+    batch_size=config['batch_size'],
     transform_function=(
         'rotate_and_flip' if config['data_augmentation'] else None),
     intensity_threshold=config['intensity_threshold'],
@@ -215,7 +217,7 @@ if validation_data is not None:
 else:
     checkpoint_filepath = 'weights_{epoch:03d}_{loss:.8f}.keras'
 
-steps_per_epoch = config['steps_per_epoch'] // gpus
+steps_per_epoch = config['steps_per_epoch']
 validation_steps = None if validation_data is None else steps_per_epoch
 
 output_dir = pathlib.Path(args.output_dir)

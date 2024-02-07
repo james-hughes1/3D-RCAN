@@ -1,8 +1,11 @@
 {
     "epochs": 5,
-    "steps_per_epoch": 2,
+    "steps_per_epoch": 5,
+    "batch_size": 5,
+    "intensity_threshold": 0.1,
+    "area_ratio_threshold": 0.1,
     "num_residual_groups": 2,
-    "training_data_dir": {"raw":"Raw/",
-                          "gt":"GT/"}
+    "training_data_dir": {"raw":"Training/Raw/",
+                          "gt":"Training/GT/"}
 
 }

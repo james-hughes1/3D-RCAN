@@ -7,10 +7,8 @@ import argparse
 import itertools
 import numpy as np
 import pathlib
-import tensorflow as tf
 import tifffile
 
-import rcan.model
 from rcan.utils import (
     apply,
     get_model_path,
@@ -91,9 +89,7 @@ else:
 
 model_path = get_model_path(args.model_dir)
 print('Loading model from', model_path)
-with tf.distribute.MirroredStrategy(
-        cross_device_ops=tf.distribute.ReductionToOneDevice()).scope():
-    model = load_model(model_path, input_shape=args.block_shape)
+model = load_model(model_path, input_shape=args.block_shape)
 
 if args.block_overlap_shape is None:
     overlap_shape = [

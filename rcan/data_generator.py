@@ -278,14 +278,9 @@ class DataGenerator:
             self._area_threshold,
             self._scale_factor)
 
-        options = tf.data.Options()
-        options.experimental_distribute.auto_shard_policy = (
-            tf.data.experimental.AutoShardPolicy.DATA)
-
         return (
             tf.data.Dataset
             .from_generator(lambda: gen, output_signature=gen.output_signature)
-            .with_options(options)
             .batch(self._batch_size)
             .repeat()
             .prefetch(tf.data.AUTOTUNE))
