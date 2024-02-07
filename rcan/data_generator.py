@@ -130,7 +130,7 @@ class DataGenerator:
                     'Different number of images are given: '
                     f'{len(self._x)} vs. {len(self._y)}')
 
-            x_image_0 = tifffile.imread(self._y[0])
+            x_image_0 = tifffile.imread(self._x[0])
             if len(x_image_0.shape) == len(self._shape):
                 num_channels_x = 1
             else:

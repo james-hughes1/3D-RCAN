@@ -1,3 +1,5 @@
 /RCAN3D
 /data
 *.pyc
+/Model
+/Training
