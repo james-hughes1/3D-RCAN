@@ -1,10 +1,8 @@
-colorama; sys_platform=='win32'
-h5py
-jsonschema
-keras
-numexpr
-numpy
+jsonschema==4.19.2
+keras==2.15.0
+numexpr==2.9.0
+numpy==1.23.5
 tensorflow==2.15.0
-tensorflow-probability
-tifffile
-tqdm
+tensorflow-probability==0.23.0
+tifffile==2024.1.30
+tqdm==4.66.1
