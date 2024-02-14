@@ -1,68 +1,20 @@
 # Copyright 2021 SVision Technologies LLC.
+# Copyright 2021-2022 Leica Microsystems, Inc.
 # Creative Commons Attribution-NonCommercial 4.0 International Public License
 # (CC BY-NC 4.0) https://creativecommons.org/licenses/by-nc/4.0/
 
 import fractions
 import itertools
-import keras
 import numexpr
 import numpy as np
 import pathlib
 import re
+import tensorflow as tf
 import tifffile
 import tqdm
 import tqdm.utils
-
 from .model import StandardiseLayer, DestandardiseLayer
 from .metrics import psnr, ssim
-
-from tensorflow.python.client.device_lib import list_local_devices
-
-
-def get_gpu_count():
-    '''Returns the number of available GPUs.'''
-    return len([x for x in list_local_devices() if x.device_type == 'GPU'])
-
-
-def is_multi_gpu_model(model):
-    '''Checks if the model supports multi-GPU data parallelism.'''
-    return hasattr(model, 'is_multi_gpu_model') and model.is_multi_gpu_model
-
-
-def convert_to_multi_gpu_model(model, gpus=None):
-    '''
-    Converts a model into a multi-GPU version if possible.
-
-    Parameters
-    ----------
-    model: keras.Model
-        Model to be converted.
-    gpus: int or None
-        Number of GPUs used to create model replicas. If None, all GPUs
-        available on the device will be used.
-
-    Returns
-    -------
-    keras.Model
-        Multi-GPU model.
-    '''
-
-    gpus = gpus or get_gpu_count()
-
-    if gpus <= 1 or is_multi_gpu_model(model):
-        return model
-
-    multi_gpu_model = keras.utils.multi_gpu_model(
-        model, gpus=gpus, cpu_relocation=True)
-
-    # copy weights
-    multi_gpu_model.layers[
-        -(len(multi_gpu_model.outputs) + 1)].set_weights(model.get_weights())
-
-    setattr(multi_gpu_model, 'is_multi_gpu_model', True)
-    setattr(multi_gpu_model, 'gpus', gpus)
-
-    return multi_gpu_model
 
 
 def normalize(image, p_min=2, p_max=99.9, dtype='float32'):
@@ -77,8 +29,13 @@ def normalize(image, p_min=2, p_max=99.9, dtype='float32'):
     https://doi.org/10.1038/s41592-018-0216-7
     '''
     low, high = np.percentile(image, (p_min, p_max))
-    return numexpr.evaluate(
-        '(image - low) / (high - low + 1e-6)').astype(dtype)
+
+    if low == high:
+        return image
+
+    return numexpr.evaluate('(image - low) / (high - low + 1e-6)').astype(
+        dtype
+    )
 
 
 def rescale(restored, gt):
@@ -95,18 +52,6 @@ def staircase_exponential_decay(n):
     every `n` epochs.
     '''
     return lambda epoch, lr: lr / 2 if epoch != 0 and epoch % n == 0 else lr
-
-
-def save_model(filename, model, weights_only=False):
-    if is_multi_gpu_model(model):
-        m = model.layers[-(len(model.outputs) + 1)]
-    else:
-        m = model
-
-    if weights_only:
-        m.save_weights(filename, overwrite=True)
-    else:
-        m.save(filename, overwrite=True)
 
 
 def get_model_path(directory, model_type='best'):
@@ -131,7 +76,8 @@ def get_model_path(directory, model_type='best'):
 
     def get_value(path):
         match = re.match(
-            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.keras', path.name)
+            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.keras', path.name
+        )
         if match:
             return float(match.group(2 if model_type == 'best' else 1))
         else:
@@ -162,14 +108,14 @@ def load_model(filename, input_shape=None):
         Keras model instance.
     '''
 
-    return keras.models.load_model(
+    return tf.keras.models.load_model(
         filename,
         custom_objects={
             "Standardise": StandardiseLayer,
             "Destandardise": DestandardiseLayer,
             "psnr": psnr,
-            "ssim": ssim
-        }
+            "ssim": ssim,
+        },
     )
 
 
@@ -177,8 +123,7 @@ def apply(model, data, overlap_shape=None, verbose=False):
     '''
     Applies a model to an input image. The input image stack is split into
     sub-blocks with model's input size, then the model is applied block by
-    block. The sizes of input and output images are assumed to be the same
-    while they can have different numbers of channels.
+    block.
 
     Parameters
     ----------
@@ -197,19 +142,20 @@ def apply(model, data, overlap_shape=None, verbose=False):
         Result image.
     '''
 
-    model_input_image_shape = tuple(model.input.shape.as_list()[1:-1])
-    model_output_image_shape = tuple(model.output.shape.as_list()[1:-1])
+    model_input_image_shape = model.input_shape[1:-1]
+    model_output_image_shape = model.output_shape[1:-1]
 
     if len(model_input_image_shape) != len(model_output_image_shape):
         raise NotImplementedError
 
     image_dim = len(model_input_image_shape)
-    num_input_channels = model.input.shape[-1]
-    num_output_channels = model.output.shape[-1]
+    num_input_channels = model.input_shape[-1]
+    num_output_channels = model.output_shape[-1]
 
     scale_factor = tuple(
-        fractions.Fraction(o, i) for i, o in zip(
-            model_input_image_shape, model_output_image_shape))
+        fractions.Fraction(o, i)
+        for i, o in zip(model_input_image_shape, model_output_image_shape)
+    )
 
     def _scale_tuple(t):
         t = [v * f for v, f in zip(t, scale_factor)]
@@ -220,12 +166,13 @@ def apply(model, data, overlap_shape=None, verbose=False):
         return tuple(v.numerator for v in t)
 
     def _scale_roi(roi):
-        roi = [slice(r.start * f, r.stop * f)
-               for r, f in zip(roi, scale_factor)]
+        roi = [
+            slice(r.start * f, r.stop * f) for r, f in zip(roi, scale_factor)
+        ]
 
-        if not all([
-                r.start.denominator == 1 and
-                r.stop.denominator == 1 for r in roi]):
+        if not all(
+            [r.start.denominator == 1 and r.stop.denominator == 1 for r in roi]
+        ):
             raise NotImplementedError
 
         return tuple(slice(r.start.numerator, r.stop.numerator) for r in roi)
@@ -238,28 +185,36 @@ def apply(model, data, overlap_shape=None, verbose=False):
         else:
             raise NotImplementedError
     elif len(overlap_shape) != image_dim:
-        raise ValueError(f'Overlap shape must be {image_dim}D; '
-                         f'Received shape: {overlap_shape}')
+        raise ValueError(
+            f'Overlap shape must be {image_dim}D; '
+            f'Received shape: {overlap_shape}'
+        )
 
     step_shape = tuple(
-        m - o for m, o in zip(
-            model_input_image_shape, overlap_shape))
+        m - o for m, o in zip(model_input_image_shape, overlap_shape)
+    )
 
     block_weight = np.ones(
-        [m - 2 * o for m, o
-         in zip(model_output_image_shape, _scale_tuple(overlap_shape))],
-        dtype=np.float32)
+        [
+            m - 2 * o
+            for m, o in zip(
+                model_output_image_shape, _scale_tuple(overlap_shape)
+            )
+        ],
+        dtype=np.float32,
+    )
 
     block_weight = np.pad(
         block_weight,
         [(o + 1, o + 1) for o in _scale_tuple(overlap_shape)],
-        'linear_ramp'
+        'linear_ramp',
     )[(slice(1, -1),) * image_dim]
 
-    batch_size = model.gpus if is_multi_gpu_model(model) else 1
+    batch_size = model.distribute_strategy.num_replicas_in_sync
     batch = np.zeros(
         (batch_size, *model_input_image_shape, num_input_channels),
-        dtype=np.float32)
+        dtype=np.float32,
+    )
 
     if isinstance(data, (list, tuple)):
         input_is_list = True
@@ -271,52 +226,73 @@ def apply(model, data, overlap_shape=None, verbose=False):
 
     for image in data:
         # add the channel dimension if necessary
-        if len(image.shape) == image_dim:
+        if image.ndim == image_dim:
             image = image[..., np.newaxis]
 
-        if (len(image.shape) != image_dim + 1
-                or image.shape[-1] != num_input_channels):
-            raise ValueError(f'Input image must be {image_dim}D with '
-                             f'{num_input_channels} channels; '
-                             f'Received image shape: {image.shape}')
+        if (
+            image.ndim != image_dim + 1
+            or image.shape[-1] != num_input_channels
+        ):
+            raise ValueError(
+                f'Input image must be {image_dim}D with '
+                f'{num_input_channels} channels; '
+                f'Received image shape: {image.shape}'
+            )
 
         input_image_shape = image.shape[:-1]
         output_image_shape = _scale_tuple(input_image_shape)
 
         applied = np.zeros(
-            (*output_image_shape, num_output_channels), dtype=np.float32)
+            (*output_image_shape, num_output_channels), dtype=np.float32
+        )
         sum_weight = np.zeros(output_image_shape, dtype=np.float32)
 
         num_steps = tuple(
-            i // s + (i % s != 0)
-            for i, s in zip(input_image_shape, step_shape))
+            (i + s - 1) // s for i, s in zip(input_image_shape, step_shape)
+        )
 
         # top-left corner of each block
-        blocks = list(itertools.product(
-            *[np.arange(n) * s for n, s in zip(num_steps, step_shape)]))
+        blocks = list(
+            itertools.product(
+                *[np.arange(n) * s for n, s in zip(num_steps, step_shape)]
+            )
+        )
 
         for chunk_index in tqdm.trange(
-                0, len(blocks), batch_size, disable=not verbose,
-                dynamic_ncols=True, ascii=tqdm.utils.IS_WIN):
+            0,
+            len(blocks),
+            batch_size,
+            disable=not verbose,
+            dynamic_ncols=True,
+            ascii=tqdm.utils.IS_WIN,
+        ):
             rois = []
             for batch_index, tl in enumerate(
-                    blocks[chunk_index:chunk_index + batch_size]):
-                br = [min(t + m, i) for t, m, i
-                      in zip(tl, model_input_image_shape, input_image_shape)]
+                blocks[chunk_index : chunk_index + batch_size]
+            ):
+                br = [
+                    min(t + m, i)
+                    for t, m, i in zip(
+                        tl, model_input_image_shape, input_image_shape
+                    )
+                ]
                 r1, r2 = zip(
-                    *[(slice(s, e), slice(0, e - s)) for s, e in zip(tl, br)])
+                    *[(slice(s, e), slice(0, e - s)) for s, e in zip(tl, br)]
+                )
 
                 m = image[r1]
                 if model_input_image_shape != m.shape[-1]:
-                    pad_width = [(0, b - s) for b, s
-                                 in zip(model_input_image_shape, m.shape[:-1])]
+                    pad_width = [
+                        (0, b - s)
+                        for b, s in zip(model_input_image_shape, m.shape[:-1])
+                    ]
                     pad_width.append((0, 0))
                     m = np.pad(m, pad_width, 'reflect')
 
                 batch[batch_index] = m
                 rois.append((r1, r2))
 
-            p = model.predict(batch, batch_size=batch_size)
+            p = model.predict_on_batch(batch)
 
             for batch_index in range(len(rois)):
                 for channel in range(num_output_channels):
@@ -354,11 +330,11 @@ def save_ome_tiff(filename, image):
     pixel_type = {
         np.dtype('uint8'): 'Uint8',
         np.dtype('uint16'): 'Uint16',
-        np.dtype('float32'): 'Float'
+        np.dtype('float32'): 'Float',
     }[image.dtype]
 
     channel_names = ['Raw', 'Restored', 'Ground Truth']
-    lsid_base = 'ome.drvtechnologies.com:'
+    lsid_base = 'urn:lsid:ome.xsd:'
 
     channel_info = ''
     for i, name in enumerate(channel_names[:c]):
@@ -382,14 +358,11 @@ def save_ome_tiff(filename, image):
 '''
 
     tifffile.imwrite(
-        filename,
-        data=image,
-        description=description,
-        metadata=None)
+        filename, data=image, description=description, metadata=None
+    )
 
 
 def save_tiff(filename, image, format):
-    {
-        'imagej': save_imagej_hyperstack,
-        'ome': save_ome_tiff
-    }[format](filename, image)
+    {'imagej': save_imagej_hyperstack, 'ome': save_ome_tiff}[format](
+        filename, image
+    )

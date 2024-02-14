@@ -1,3 +1,16 @@
+## Acknowledgements
+
+This repository was forked from https://github.com/AiviaCommunity/3D-RCAN on January 29th 2024. It is being adapted with the aim of reproducing the training pipeline on more current versions of TensorFlow, and seeking to build upon it.
+
+The original version of the code was released with the following copyright and licensing:
+
+> Copyright © 2021 [SVision Technologies LLC.](https://www.aivia-software.com/)
+> Copyright © 2021-2022 Leica Microsystems, Inc.
+>
+> Released under Creative Commons Attribution-NonCommercial 4.0 International Public License ([CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/))
+
+Below is the README content from the original repository at the time of accessing it.
+
 # 3D-RCAN
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
@@ -13,25 +26,25 @@
 ## System Requirements
 
 - Windows 10. Linux and Mac OS should be able to run the code but the code has been only tested on Windows 10 so far.
-- Python 3.6+
+- Python 3.9
 - NVIDIA GPU
-- CUDA 10.0 and cuDNN 7.6.5
+- CUDA 11.2 and cuDNN 8.1.0
 
 Tested Environment:
 
 1. Smaller RCAN (for less capable GPUs):
     - RCAN Configuration: [config.json](./config.json)
     - Windows 10
-    - Python 3.7
+    - Python 3.9.5
     - NVIDIA GTX 1060 6GB
-    - CUDA 10.0 and cuDNN 7.6.5
+    - CUDA 11.2 and cuDNN 8.1.0
 
 2. Larger RCAN (for better results):
     - RCAN Configuration: [config_large.json](./config_large.json)
     - Windows 10
-    - Python 3.7
-    - NVIDIA Tesla P100 16 GB
-    - CUDA 10.0 and cuDNN 7.6.5
+    - Python 3.9.7
+    - NVIDIA RTX A6000 48GB
+    - CUDA 11.2 and cuDNN 8.1.0
 
 ## Dataset
 
@@ -141,22 +154,22 @@ Note that you can also use `training_data_dir` and `training_image_pairs` at the
 Following optional variables can be also set in the JSON file (if not set, default values will be used):
 
 - `validation_data_dir`
-  
+
   - Paths to raw and groud truth data directories for validation
-    
+
   - Default: None
-  
+
     ```javascript
     "validation_data_dir": {"raw":"/path/to/validation/Raw/",
                             "gt":"/path/to/validation/GT/"}
     ```
-  
+
 - `validation_image_pairs` (array of image pairs)
-  
+
   - Validation data on which to evaluate the loss and metrics at the end of each epoch
 
   - Default: None
-  
+
     ```javascript
     "validation_image_pairs": [
          {"raw": "/path/to/additional/Raw_validation/image1.tif",
@@ -165,63 +178,63 @@ Following optional variables can be also set in the JSON file (if not set, defau
           "gt": "/path/to/additional/GT_validation/image2.tif"}
         ]
     ```
-  
+
 - `epochs` (integer)
-  
+
   - Number of epochs to train the model
 
   - Default: 300,  Range: >=1
-  
+
     ```javascript
     "epochs": 200
     ```
-  
+
 - `steps_per_epoch` (integer)
-  
+
   - Number of steps to perform back-propagation on mini-batches in each epoch
 
   - Default: 256, Range: >=1
-  
+
     ```javascript
     "steps_per_epoch": 100
     ```
-  
+
 - `num_channels` (integer)
-  
+
   - Number of feature channels in RCAN
 
   - Default: 32, Range: >=1
-  
+
     ```javascript
     "num_channels": 16
     ```
-  
+
 - `num_residual_blocks` (integer)
-  
+
   - Number of residual channel attention blocks in each residual group in RCAN
 
   - Default: 3, Range: >=1
-  
+
     ```javascript
     "num_channels": 4
     ```
-  
+
 - `num_residual_groups` (integer)
-  
+
   - Number of residual groups in RCAN
 
   - Default: 5, Range: >= 1
-  
+
     ```javascript
     "num_residual_groups": 4
     ```
-  
+
 - `channel_reduction` (integer)
-  
+
   - Channel reduction ratio for channel attention
-  
+
   - Default: 8, Range: >=1
-  
+
     ```javascript
     "channel_reduction": 4
     ```
@@ -238,7 +251,7 @@ Following optional variables can be also set in the JSON file (if not set, defau
 
 - `intensity_threshold` (number)
 
-  - Threshold used to reject patches with low average intensity 
+  - Threshold used to reject patches with low average intensity
 
   - Default: 0.25, Range: >0.0
 
@@ -248,7 +261,7 @@ Following optional variables can be also set in the JSON file (if not set, defau
 
 - `area_ratio_threshold` (number)
 
-  - Threshold used to reject patches with small areas of valid signal 
+  - Threshold used to reject patches with small areas of valid signal
 
   - Default: 0.5, Range: 0.0~1.0
 
@@ -342,7 +355,7 @@ python apply.py -m model_dir -i input_dir -g ground_truth_dir -o output_dir
 
 - `-i` or `--input` (string) [required]
 
-    - The path of the input raw image  
+    - The path of the input raw image
 
         - The output (“-o”) must be an image too
 
@@ -350,7 +363,7 @@ python apply.py -m model_dir -i input_dir -g ground_truth_dir -o output_dir
         -i ./raw/image000004.tif
         ```
 
-    -  The folder path that contains input raw images 
+    -  The folder path that contains input raw images
 
         - The output (“-o”) must be a folder too
 
@@ -360,50 +373,50 @@ python apply.py -m model_dir -i input_dir -g ground_truth_dir -o output_dir
 
 - `-o` or `--output` (string) [required]
 
-    - The path of the output image  
-    
+    - The path of the output image
+
         - The input(“-i”) must be an image too
-    
+
           ```posh
           -o ./Result/Result_image000004.tif
           ```
-    
+
     - The path of the output folder
-    
+
         - The input(“-i”) must be a folder too
-    
+
           ```posh
           -o ./Result
           ```
-    
+
 - `-g` or `--ground_truth` (string)
 
     - Reference ground truth image. If it is set, the output TIFF is a three-channel ImageJ Hyperstack with raw, restored, and GT.
-    
+
         - The input(“-i”) must be an image too
-    
+
             ```posh
             -g ./GT/image000004_decon.tif
             ```
-    
+
     - The path of the folder that constrains reference ground truth images. If it is set, each output TIFF is a three-channel ImageJ Hyperstack with raw, restored, and GT.
-    
+
         - The input(“-i”) must be a folder too
-        
+
             ```posh
             -g ./GT
             ```
-    
+
 - `-b` or `--bpp` (int)
 
     - Bit depth of the output image
-    
+
         - Default: 32, Options: 8, 16, or 32
-        
+
         ```posh
         -b 16
         ```
-    
+
 - `-B` or `--block_shape`(tuple_of_ints)
 
     - The dimensions (Z,Y,X) of the block used to divide an input image into small blocks that could fit the GPU memory
@@ -440,7 +453,7 @@ python apply.py -m model_dir -i input_dir -g ground_truth_dir -o output_dir
       --normalize_output_range_between_zero_and_one
       ```
 
-  - Combine with --bpp, for example to normalized to 16-bit  [0, 65535] 
+  - Combine with --bpp, for example to normalized to 16-bit  [0, 65535]
 
     - Minimum intensity is mapped to 0
     - Maximum intensity is mapped to 65535
@@ -481,5 +494,6 @@ ECCV 2018
 ## License
 
 Copyright © 2021 [SVision Technologies LLC.](https://www.aivia-software.com/)
+Copyright © 2021-2022 Leica Microsystems, Inc.
 
 Released under Creative Commons Attribution-NonCommercial 4.0 International Public License ([CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/))
