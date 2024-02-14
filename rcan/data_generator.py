@@ -41,32 +41,43 @@ class DataGenerator:
         Scale factor for the target patch size. Positive and negative values
         mean up- and down-scaling respectively.
     '''
-    def __init__(self,
-                 shape,
-                 batch_size,
-                 transform_function='rotate_and_flip',
-                 intensity_threshold=0.0,
-                 area_ratio_threshold=0.0,
-                 scale_factor=1):
+
+    def __init__(
+        self,
+        shape,
+        batch_size,
+        transform_function='rotate_and_flip',
+        intensity_threshold=0.0,
+        area_ratio_threshold=0.0,
+        scale_factor=1,
+    ):
         def rotate_and_flip(x, y, dim):
             if dim == 2:
                 k = np.random.randint(0, 4)
-                x, y = [None if v is None else np.rot90(v, k=k)
-                        for v in (x, y)]
+                x, y = [
+                    None if v is None else np.rot90(v, k=k) for v in (x, y)
+                ]
                 if np.random.random() < 0.5:
-                    x, y = [None if v is None else np.fliplr(v)
-                            for v in (x, y)]
+                    x, y = [
+                        None if v is None else np.fliplr(v) for v in (x, y)
+                    ]
                 return x, y
             elif dim == 3:
                 k = np.random.randint(0, 4)
-                x, y = [None if v is None else np.rot90(v, k=k, axes=(1, 2))
-                        for v in (x, y)]
+                x, y = [
+                    None if v is None else np.rot90(v, k=k, axes=(1, 2))
+                    for v in (x, y)
+                ]
                 if np.random.random() < 0.5:
-                    x, y = [None if v is None else np.flip(v, axis=1)
-                            for v in (x, y)]
+                    x, y = [
+                        None if v is None else np.flip(v, axis=1)
+                        for v in (x, y)
+                    ]
                 if np.random.random() < 0.5:
-                    x, y = [None if v is None else np.flip(v, axis=0)
-                            for v in (x, y)]
+                    x, y = [
+                        None if v is None else np.flip(v, axis=0)
+                        for v in (x, y)
+                    ]
                 return x, y
             else:
                 raise ValueError('Unsupported dimension')
@@ -80,7 +91,8 @@ class DataGenerator:
             if shape[-2] != shape[-1]:
                 raise ValueError(
                     'Patch shape must be square when using `rotate_and_flip`; '
-                    f'Received shape: {shape}')
+                    f'Received shape: {shape}'
+                )
             self._transform_function = lambda x, y: rotate_and_flip(x, y, dim)
         elif callable(transform_function):
             self._transform_function = transform_function
@@ -103,38 +115,47 @@ class DataGenerator:
         def _scale(self, shape):
             return tuple(
                 s * f if f > 0 else s // -f
-                for s, f in zip(shape, self._scale_factor))
+                for s, f in zip(shape, self._scale_factor)
+            )
 
-        def __init__(self,
-                     x,
-                     y,
-                     shape,
-                     transform_function,
-                     intensity_threshold,
-                     area_threshold,
-                     scale_factor):
+        def __init__(
+            self,
+            x,
+            y,
+            shape,
+            transform_function,
+            intensity_threshold,
+            area_threshold,
+            scale_factor,
+        ):
             self._transform_function = transform_function
             self._intensity_threshold = intensity_threshold
             self._area_threshold = area_threshold
             self._scale_factor = scale_factor
             self._shape = shape
 
-            for s, f, in zip(shape, self._scale_factor):
+            for (
+                s,
+                f,
+            ) in zip(shape, self._scale_factor):
                 if f < 0 and s % -f != 0:
                     raise ValueError(
                         'When downsampling, all elements in `shape` must be '
                         'divisible by the scale factor; '
                         f'Received shape: {shape}, '
-                        f'scale factor: {self._scale_factor}')
+                        f'scale factor: {self._scale_factor}'
+                    )
 
             self._x, self._y = [
                 list(m) if isinstance(m, (list, tuple)) else [m]
-                for m in [x, y]]
+                for m in [x, y]
+            ]
 
             if self._y is not None and len(self._x) != len(self._y):
                 raise ValueError(
                     'Different number of images are given: '
-                    f'{len(self._x)} vs. {len(self._y)}')
+                    f'{len(self._x)} vs. {len(self._y)}'
+                )
 
             x_image_0 = tifffile.imread(self._x[0])
             y_image_0 = tifffile.imread(self._y[0])
@@ -164,7 +185,8 @@ class DataGenerator:
 
                 if x_image_j.shape[:-1] < shape:
                     raise ValueError(
-                        'Source image must be larger than the patch size')
+                        'Source image must be larger than the patch size'
+                    )
 
                 if y_image_j is not None:
                     if len(y_image_j.shape) == len(shape):
@@ -178,19 +200,27 @@ class DataGenerator:
                         raise ValueError(
                             'Invalid target image size: '
                             f'expected {expected_y_image_size}, '
-                            f'but received {y_image_j.shape[:-1]}')
+                            f'but received {y_image_j.shape[:-1]}'
+                        )
 
                 if x_image_j.shape[-1] != x_image_0.shape[-1]:
-                    raise ValueError('All source images must have the'
-                        ' same number of channels')
+                    raise ValueError(
+                        'All source images must have the'
+                        ' same number of channels'
+                    )
 
-                if (self._y is not None
-                        and y_image_j.shape[-1] != y_image_0.shape[-1]):
-                    raise ValueError('All target images must have the'
-                        ' same number of channels')
+                if (
+                    self._y is not None
+                    and y_image_j.shape[-1] != y_image_0.shape[-1]
+                ):
+                    raise ValueError(
+                        'All target images must have the'
+                        ' same number of channels'
+                    )
 
             output_signature_x = tf.TensorSpec(
-                (*shape, x_image_0.shape[-1]), x_image_0.dtype)
+                (*shape, x_image_0.shape[-1]), x_image_0.dtype
+            )
 
             if self._y is None:
                 self.output_signature = (output_signature_x,)
@@ -199,7 +229,9 @@ class DataGenerator:
                     output_signature_x,
                     tf.TensorSpec(
                         (*self._scale(shape), y_image_0.shape[-1]),
-                        y_image_0.dtype))
+                        y_image_0.dtype,
+                    ),
+                )
 
         def __iter__(self):
             while True:
@@ -218,24 +250,30 @@ class DataGenerator:
                     tl = [
                         np.random.randint(0, a - b + 1)
                         for a, b in zip(
-                            x_image_j.shape, self.output_signature[0].shape)]
+                            x_image_j.shape, self.output_signature[0].shape
+                        )
+                    ]
 
                     patch_x_roi = tuple(
                         slice(a, a + b)
-                        for a, b in zip(tl, self.output_signature[0].shape))
+                        for a, b in zip(tl, self.output_signature[0].shape)
+                    )
                     patch_x = np.copy(x_image_j[patch_x_roi])
 
                     if y_image_j is not None:
                         patch_y_roi = tuple(
-                            slice(a, a + b) for a, b in
-                            zip(self._scale(tl),
-                                self.output_signature[1].shape))
+                            slice(a, a + b)
+                            for a, b in zip(
+                                self._scale(tl), self.output_signature[1].shape
+                            )
+                        )
                         patch_y = np.copy(y_image_j[patch_y_roi])
 
                     if self._intensity_threshold > 0:
                         foreground_area = np.count_nonzero(
                             (patch_x if self._y is None else patch_y)
-                            > self._intensity_threshold)
+                            > self._intensity_threshold
+                        )
                         if foreground_area < self._area_threshold:
                             continue
 
@@ -245,7 +283,8 @@ class DataGenerator:
                     warnings.warn(
                         'Failed to sample a valid patch',
                         RuntimeWarning,
-                        stacklevel=3)
+                        stacklevel=3,
+                    )
 
                 if self._y is None:
                     yield self._transform_function(patch_x, None)[0]
@@ -276,11 +315,14 @@ class DataGenerator:
             self._transform_function,
             self._intensity_threshold,
             self._area_threshold,
-            self._scale_factor)
+            self._scale_factor,
+        )
 
         return (
-            tf.data.Dataset
-            .from_generator(lambda: gen, output_signature=gen.output_signature)
+            tf.data.Dataset.from_generator(
+                lambda: gen, output_signature=gen.output_signature
+            )
             .batch(self._batch_size)
             .repeat()
-            .prefetch(tf.data.AUTOTUNE))
+            .prefetch(tf.data.AUTOTUNE)
+        )

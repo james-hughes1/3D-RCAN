@@ -33,8 +33,9 @@ def normalize(image, p_min=2, p_max=99.9, dtype='float32'):
     if low == high:
         return image
 
-    return numexpr.evaluate(
-        '(image - low) / (high - low + 1e-6)').astype(dtype)
+    return numexpr.evaluate('(image - low) / (high - low + 1e-6)').astype(
+        dtype
+    )
 
 
 def rescale(restored, gt):
@@ -75,7 +76,8 @@ def get_model_path(directory, model_type='best'):
 
     def get_value(path):
         match = re.match(
-            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.keras', path.name)
+            r'weights_(\d+)_([+-]?\d+(?:\.\d+)?)\.keras', path.name
+        )
         if match:
             return float(match.group(2 if model_type == 'best' else 1))
         else:
@@ -112,8 +114,8 @@ def load_model(filename, input_shape=None):
             "Standardise": StandardiseLayer,
             "Destandardise": DestandardiseLayer,
             "psnr": psnr,
-            "ssim": ssim
-        }
+            "ssim": ssim,
+        },
     )
 
 
@@ -151,8 +153,9 @@ def apply(model, data, overlap_shape=None, verbose=False):
     num_output_channels = model.output_shape[-1]
 
     scale_factor = tuple(
-        fractions.Fraction(o, i) for i, o in zip(
-            model_input_image_shape, model_output_image_shape))
+        fractions.Fraction(o, i)
+        for i, o in zip(model_input_image_shape, model_output_image_shape)
+    )
 
     def _scale_tuple(t):
         t = [v * f for v, f in zip(t, scale_factor)]
@@ -163,12 +166,13 @@ def apply(model, data, overlap_shape=None, verbose=False):
         return tuple(v.numerator for v in t)
 
     def _scale_roi(roi):
-        roi = [slice(r.start * f, r.stop * f)
-               for r, f in zip(roi, scale_factor)]
+        roi = [
+            slice(r.start * f, r.stop * f) for r, f in zip(roi, scale_factor)
+        ]
 
-        if not all([
-                r.start.denominator == 1 and
-                r.stop.denominator == 1 for r in roi]):
+        if not all(
+            [r.start.denominator == 1 and r.stop.denominator == 1 for r in roi]
+        ):
             raise NotImplementedError
 
         return tuple(slice(r.start.numerator, r.stop.numerator) for r in roi)
@@ -183,27 +187,34 @@ def apply(model, data, overlap_shape=None, verbose=False):
     elif len(overlap_shape) != image_dim:
         raise ValueError(
             f'Overlap shape must be {image_dim}D; '
-            f'Received shape: {overlap_shape}')
+            f'Received shape: {overlap_shape}'
+        )
 
     step_shape = tuple(
-        m - o for m, o in zip(
-            model_input_image_shape, overlap_shape))
+        m - o for m, o in zip(model_input_image_shape, overlap_shape)
+    )
 
     block_weight = np.ones(
-        [m - 2 * o for m, o
-         in zip(model_output_image_shape, _scale_tuple(overlap_shape))],
-        dtype=np.float32)
+        [
+            m - 2 * o
+            for m, o in zip(
+                model_output_image_shape, _scale_tuple(overlap_shape)
+            )
+        ],
+        dtype=np.float32,
+    )
 
     block_weight = np.pad(
         block_weight,
         [(o + 1, o + 1) for o in _scale_tuple(overlap_shape)],
-        'linear_ramp'
+        'linear_ramp',
     )[(slice(1, -1),) * image_dim]
 
     batch_size = model.distribute_strategy.num_replicas_in_sync
     batch = np.zeros(
         (batch_size, *model_input_image_shape, num_input_channels),
-        dtype=np.float32)
+        dtype=np.float32,
+    )
 
     if isinstance(data, (list, tuple)):
         input_is_list = True
@@ -218,41 +229,63 @@ def apply(model, data, overlap_shape=None, verbose=False):
         if image.ndim == image_dim:
             image = image[..., np.newaxis]
 
-        if (image.ndim != image_dim + 1
-                or image.shape[-1] != num_input_channels):
-            raise ValueError(f'Input image must be {image_dim}D with '
-                             f'{num_input_channels} channels; '
-                             f'Received image shape: {image.shape}')
+        if (
+            image.ndim != image_dim + 1
+            or image.shape[-1] != num_input_channels
+        ):
+            raise ValueError(
+                f'Input image must be {image_dim}D with '
+                f'{num_input_channels} channels; '
+                f'Received image shape: {image.shape}'
+            )
 
         input_image_shape = image.shape[:-1]
         output_image_shape = _scale_tuple(input_image_shape)
 
         applied = np.zeros(
-            (*output_image_shape, num_output_channels), dtype=np.float32)
+            (*output_image_shape, num_output_channels), dtype=np.float32
+        )
         sum_weight = np.zeros(output_image_shape, dtype=np.float32)
 
         num_steps = tuple(
-            (i + s - 1) // s for i, s in zip(input_image_shape, step_shape))
+            (i + s - 1) // s for i, s in zip(input_image_shape, step_shape)
+        )
 
         # top-left corner of each block
-        blocks = list(itertools.product(
-            *[np.arange(n) * s for n, s in zip(num_steps, step_shape)]))
+        blocks = list(
+            itertools.product(
+                *[np.arange(n) * s for n, s in zip(num_steps, step_shape)]
+            )
+        )
 
         for chunk_index in tqdm.trange(
-                0, len(blocks), batch_size, disable=not verbose,
-                dynamic_ncols=True, ascii=tqdm.utils.IS_WIN):
+            0,
+            len(blocks),
+            batch_size,
+            disable=not verbose,
+            dynamic_ncols=True,
+            ascii=tqdm.utils.IS_WIN,
+        ):
             rois = []
             for batch_index, tl in enumerate(
-                    blocks[chunk_index:chunk_index + batch_size]):
-                br = [min(t + m, i) for t, m, i
-                      in zip(tl, model_input_image_shape, input_image_shape)]
+                blocks[chunk_index : chunk_index + batch_size]
+            ):
+                br = [
+                    min(t + m, i)
+                    for t, m, i in zip(
+                        tl, model_input_image_shape, input_image_shape
+                    )
+                ]
                 r1, r2 = zip(
-                    *[(slice(s, e), slice(0, e - s)) for s, e in zip(tl, br)])
+                    *[(slice(s, e), slice(0, e - s)) for s, e in zip(tl, br)]
+                )
 
                 m = image[r1]
                 if model_input_image_shape != m.shape[-1]:
-                    pad_width = [(0, b - s) for b, s
-                                 in zip(model_input_image_shape, m.shape[:-1])]
+                    pad_width = [
+                        (0, b - s)
+                        for b, s in zip(model_input_image_shape, m.shape[:-1])
+                    ]
                     pad_width.append((0, 0))
                     m = np.pad(m, pad_width, 'reflect')
 
@@ -297,7 +330,7 @@ def save_ome_tiff(filename, image):
     pixel_type = {
         np.dtype('uint8'): 'Uint8',
         np.dtype('uint16'): 'Uint16',
-        np.dtype('float32'): 'Float'
+        np.dtype('float32'): 'Float',
     }[image.dtype]
 
     channel_names = ['Raw', 'Restored', 'Ground Truth']
@@ -325,14 +358,11 @@ def save_ome_tiff(filename, image):
 '''
 
     tifffile.imwrite(
-        filename,
-        data=image,
-        description=description,
-        metadata=None)
+        filename, data=image, description=description, metadata=None
+    )
 
 
 def save_tiff(filename, image, format):
-    {
-        'imagej': save_imagej_hyperstack,
-        'ome': save_ome_tiff
-    }[format](filename, image)
+    {'imagej': save_imagej_hyperstack, 'ome': save_ome_tiff}[format](
+        filename, image
+    )

@@ -37,7 +37,8 @@ def _global_average_pooling(x):
         return tf.keras.layers.GlobalAveragePooling3D()(x)
     else:
         raise NotImplementedError(
-            f'{n}D global average pooling is not supported')
+            f'{n}D global average pooling is not supported'
+        )
 
 
 def _channel_attention_block(x, reduction):
@@ -56,18 +57,18 @@ def _channel_attention_block(x, reduction):
     num_channels = _get_num_channels(x)
 
     y = _global_average_pooling(x)
-    y = tf.keras.layers.Reshape(
-        (*(1,) * _get_spatial_ndim(x), num_channels))(y)
+    y = tf.keras.layers.Reshape((*(1,) * _get_spatial_ndim(x), num_channels))(
+        y
+    )
     y = _conv(y, num_channels // reduction, 1, activation='relu')
     y = _conv(y, num_channels, 1, activation='sigmoid')
 
     return tf.keras.layers.Multiply()([x, y])
 
 
-def _residual_channel_attention_blocks(x,
-                                       repeat=1,
-                                       channel_reduction=8,
-                                       residual_scaling=1.0):
+def _residual_channel_attention_blocks(
+    x, repeat=1, channel_reduction=8, residual_scaling=1.0
+):
     num_channels = _get_num_channels(x)
 
     for _ in range(repeat):
@@ -114,14 +115,16 @@ class DestandardiseLayer(tf.keras.layers.Layer):
         return {}
 
 
-def build_rcan(input_shape=(16, 256, 256, 1),
-               *,
-               num_channels=32,
-               num_residual_blocks=3,
-               num_residual_groups=5,
-               channel_reduction=8,
-               residual_scaling=1.0,
-               num_output_channels=-1):
+def build_rcan(
+    input_shape=(16, 256, 256, 1),
+    *,
+    num_channels=32,
+    num_residual_blocks=3,
+    num_residual_groups=5,
+    channel_reduction=8,
+    residual_scaling=1.0,
+    num_output_channels=-1,
+):
     '''
     Builds a residual channel attention network. Note that the upscale module
     at the end of the network is omitted so that the input and output of the
@@ -171,10 +174,8 @@ def build_rcan(input_shape=(16, 256, 256, 1),
         short_skip = x
 
         x = _residual_channel_attention_blocks(
-            x,
-            num_residual_blocks,
-            channel_reduction,
-            residual_scaling)
+            x, num_residual_blocks, channel_reduction, residual_scaling
+        )
 
         if num_residual_groups == 1:
             break

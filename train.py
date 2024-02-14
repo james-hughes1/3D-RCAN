@@ -26,10 +26,12 @@ def load_data_paths(config, data_type):
     if data_type + '_data_dir' in config:
         raw_dir, gt_dir = [
             pathlib.Path(config[data_type + '_data_dir'][t])
-            for t in ['raw', 'gt']]
+            for t in ['raw', 'gt']
+        ]
 
         raw_files, gt_files = [
-            sorted(d.glob('*.tif')) for d in [raw_dir, gt_dir]]
+            sorted(d.glob('*.tif')) for d in [raw_dir, gt_dir]
+        ]
 
         if not raw_files:
             raise RuntimeError(f'No TIFF file found in {raw_dir}')
@@ -37,7 +39,8 @@ def load_data_paths(config, data_type):
         if len(raw_files) != len(gt_files):
             raise RuntimeError(
                 f'"{raw_dir}" and "{gt_dir}" must contain the same number of '
-                'TIFF files')
+                'TIFF files'
+            )
 
         for raw_file, gt_file in zip(raw_files, gt_files):
             image_pair_list.append({'raw': str(raw_file), 'gt': str(gt_file)})
@@ -60,7 +63,8 @@ def load_data_paths(config, data_type):
         if raw.shape != gt.shape:
             raise ValueError(
                 'Raw and GT images must be the same size: '
-                f'{p["raw"]} {raw.shape} vs. {p["gt"]} {gt.shape}')
+                f'{p["raw"]} {raw.shape} vs. {p["gt"]} {gt.shape}'
+            )
     for ndim in ndim_list:
         if ndim != ndim_list[0]:
             raise ValueError(
@@ -90,7 +94,7 @@ schema = {
             'type': 'array',
             'items': {'type': 'integer', 'minimum': 1},
             'minItems': 2,
-            'maxItems': 3
+            'maxItems': 3,
         },
         'num_channels': {'type': 'integer', 'minimum': 1},
         'num_residual_blocks': {'type': 'integer', 'minimum': 1},
@@ -106,13 +110,13 @@ schema = {
         'loss': {'type': 'string', 'enum': ['mae', 'mse']},
         'metrics': {
             'type': 'array',
-            'items': {'type': 'string', 'enum': ['psnr', 'ssim']}
-        }
+            'items': {'type': 'string', 'enum': ['psnr', 'ssim']},
+        },
     },
     'additionalProperties': False,
     'anyOf': [
         {'required': ['training_image_pairs']},
-        {'required': ['training_data_dir']}
+        {'required': ['training_data_dir']},
     ],
     'definitions': {
         'raw_gt_pair': {
@@ -120,14 +124,14 @@ schema = {
             'properties': {
                 'raw': {'type': 'string'},
                 'gt': {'type': 'string'},
-            }
+            },
         },
         'image_pairs': {
             'type': 'array',
             'items': {'$ref': '#/definitions/raw_gt_pair'},
-            'minItems': 1
-        }
-    }
+            'minItems': 1,
+        },
+    },
 }
 
 with open(args.config) as f:
@@ -148,9 +152,7 @@ config.setdefault('initial_learning_rate', 1e-4)
 config.setdefault('loss', 'mae')
 config.setdefault('metrics', ['psnr'])
 
-training_data, min_input_shape_training = load_data_paths(
-    config, 'training'
-)
+training_data, min_input_shape_training = load_data_paths(config, 'training')
 validation_data, min_input_shape_validation = load_data_paths(
     config, 'validation'
 )
@@ -165,7 +167,8 @@ if 'input_shape' in config:
     input_shape = config['input_shape']
     if len(input_shape) != ndim:
         raise ValueError(
-            f'`input_shape` must be a {ndim}D array; received: {input_shape}')
+            f'`input_shape` must be a {ndim}D array; received: {input_shape}'
+        )
 else:
     input_shape = (16, 256, 256) if ndim == 3 else (256, 256)
 
@@ -175,10 +178,12 @@ if validation_data:
 
 print('Building RCAN model')
 print('  - input_shape =', input_shape)
-for s in ['num_channels',
-          'num_residual_blocks',
-          'num_residual_groups',
-          'channel_reduction']:
+for s in [
+    'num_channels',
+    'num_residual_blocks',
+    'num_residual_groups',
+    'channel_reduction',
+]:
     print(f'  - {s} =', config[s])
 
 model = build_rcan(
@@ -186,24 +191,29 @@ model = build_rcan(
     num_channels=config['num_channels'],
     num_residual_blocks=config['num_residual_blocks'],
     num_residual_groups=config['num_residual_groups'],
-    channel_reduction=config['channel_reduction'])
+    channel_reduction=config['channel_reduction'],
+)
 
 model.compile(
     optimizer=tf.keras.optimizers.Adam(
-        learning_rate=config['initial_learning_rate']),
+        learning_rate=config['initial_learning_rate']
+    ),
     loss={
         'mae': tf.keras.losses.MeanAbsoluteError(),
-        'mse': tf.keras.losses.MeanSquaredError()
+        'mse': tf.keras.losses.MeanSquaredError(),
     }[config['loss']],
-    metrics=[{'psnr': psnr, 'ssim': ssim}[m] for m in config['metrics']])
+    metrics=[{'psnr': psnr, 'ssim': ssim}[m] for m in config['metrics']],
+)
 
 data_gen = DataGenerator(
     input_shape,
     batch_size=config['batch_size'],
     transform_function=(
-        'rotate_and_flip' if config['data_augmentation'] else None),
+        'rotate_and_flip' if config['data_augmentation'] else None
+    ),
     intensity_threshold=config['intensity_threshold'],
-    area_ratio_threshold=config['area_ratio_threshold'])
+    area_ratio_threshold=config['area_ratio_threshold'],
+)
 
 training_data = data_gen.flow(
     [p['raw'] for p in training_data], [p['gt'] for p in training_data]
@@ -233,13 +243,16 @@ model.fit(
     verbose=0,
     callbacks=[
         tf.keras.callbacks.LearningRateScheduler(
-            staircase_exponential_decay(config['epochs'] // 4)),
+            staircase_exponential_decay(config['epochs'] // 4)
+        ),
         tf.keras.callbacks.TensorBoard(
-            log_dir=str(output_dir),
-            write_graph=False),
+            log_dir=str(output_dir), write_graph=False
+        ),
         tf.keras.callbacks.ModelCheckpoint(
             str(output_dir / checkpoint_filepath),
             monitor='loss' if validation_data is None else 'val_loss',
-            save_best_only=True),
-        TqdmCallback()
-    ])
+            save_best_only=True,
+        ),
+        TqdmCallback(),
+    ],
+)

@@ -20,7 +20,8 @@ class _PixelShuffle(keras.layers.Layer):
         super().__init__(**kwargs)
         self.rank = rank
         self.scale_factor = keras.utils.conv_utils.normalize_tuple(
-            scale_factor, rank, 'scale_factor')
+            scale_factor, rank, 'scale_factor'
+        )
         self.downshuffle = downshuffle
 
     def call(self, inputs):
@@ -28,34 +29,55 @@ class _PixelShuffle(keras.layers.Layer):
         output_shape = self.compute_output_shape(input_shape)
 
         if self.rank == 2 and len(set(self.scale_factor)) == 1:
-            return (tf.space_to_depth if self.downshuffle
-                    else tf.depth_to_space)(inputs, self.scale_factor[0])
+            return (
+                tf.space_to_depth if self.downshuffle else tf.depth_to_space
+            )(inputs, self.scale_factor[0])
 
         if self.downshuffle:
             outputs = K.reshape(
                 inputs,
-                (-1,
-                 *list(itertools.chain.from_iterable(
-                     zip(output_shape[1:-1], self.scale_factor))),
-                 input_shape[-1]))
+                (
+                    -1,
+                    *list(
+                        itertools.chain.from_iterable(
+                            zip(output_shape[1:-1], self.scale_factor)
+                        )
+                    ),
+                    input_shape[-1],
+                ),
+            )
 
             outputs = K.permute_dimensions(
                 outputs,
-                (0,
-                 *list(range(1, 2 * self.rank, 2)),
-                 *list(range(2, 2 * self.rank + 1, 2)),
-                 2 * self.rank + 1))
+                (
+                    0,
+                    *list(range(1, 2 * self.rank, 2)),
+                    *list(range(2, 2 * self.rank + 1, 2)),
+                    2 * self.rank + 1,
+                ),
+            )
         else:
             outputs = K.reshape(
                 inputs,
-                (-1, *input_shape[1:-1], *self.scale_factor, output_shape[-1]))
+                (-1, *input_shape[1:-1], *self.scale_factor, output_shape[-1]),
+            )
 
             outputs = K.permute_dimensions(
                 outputs,
-                (0,
-                 *[x + 1 for x in itertools.chain.from_iterable(
-                   zip(range(self.rank), range(self.rank, 2 * self.rank)))],
-                 2 * self.rank + 1))
+                (
+                    0,
+                    *[
+                        x + 1
+                        for x in itertools.chain.from_iterable(
+                            zip(
+                                range(self.rank),
+                                range(self.rank, 2 * self.rank),
+                            )
+                        )
+                    ],
+                    2 * self.rank + 1,
+                ),
+            )
 
         return K.reshape(outputs, (-1, *output_shape[1:]))
 
@@ -63,7 +85,8 @@ class _PixelShuffle(keras.layers.Layer):
         if len(input_shape) != self.rank + 2:
             raise ValueError(
                 f'Inputs should have rank {self.rank + 2}; '
-                f'Received input shape: {input_shape}')
+                f'Received input shape: {input_shape}'
+            )
 
         if self.downshuffle:
             output_shape = [input_shape[0]]
@@ -75,7 +98,8 @@ class _PixelShuffle(keras.layers.Layer):
                         'For downshuffling, all spatial dimensions must be '
                         'divisible by their corresponding scaling factors; '
                         f'Received input shape: {input_shape}, '
-                        f'scaling factors: {self.scale_factor}')
+                        f'scaling factors: {self.scale_factor}'
+                    )
                 else:
                     output_shape.append(s // r)
             output_shape.append(input_shape[-1] * np.prod(self.scale_factor))
@@ -87,13 +111,17 @@ class _PixelShuffle(keras.layers.Layer):
                 raise ValueError(
                     'For upshuffling, the number of input channels must be '
                     f'divisible by {np.prod(self.scale_factor)}; '
-                    f'Received input shape: {input_shape}')
+                    f'Received input shape: {input_shape}'
+                )
 
             return (
                 input_shape[0],
-                *[None if s is None else s * r
-                  for s, r in zip(input_shape[1:-1], self.scale_factor)],
-                input_shape[-1] // np.prod(self.scale_factor))
+                *[
+                    None if s is None else s * r
+                    for s, r in zip(input_shape[1:-1], self.scale_factor)
+                ],
+                input_shape[-1] // np.prod(self.scale_factor),
+            )
 
     def get_config(self):
         config = super().get_config()

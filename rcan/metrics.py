@@ -49,8 +49,8 @@ def ssim(y_true, y_pred):
       https://doi.org/10.1109/TIP.2003.819861
     '''
 
-    c1 = 0.01 ** 2
-    c2 = 0.03 ** 2
+    c1 = 0.01**2
+    c2 = 0.03**2
 
     dim = K.ndim(y_pred) - 2
     if dim not in (2, 3):
@@ -67,7 +67,8 @@ def ssim(y_true, y_pred):
         # channel-wise weighted average using the Gaussian kernel
         return tf.concat(
             [conv(y, kernel) for y in tf.split(x, num_channels, axis=-1)],
-            axis=-1)
+            axis=-1,
+        )
 
     ux = average(y_true)
     uy = average(y_pred)
