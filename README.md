@@ -1,3 +1,16 @@
+## Acknowledgements
+
+This repository was forked from https://github.com/AiviaCommunity/3D-RCAN on January 29th 2024. It is being adapted with the aim of reproducing the training pipeline on more current versions of TensorFlow, and seeking to build upon it.
+
+The original version of the code was released with the following copyright and licensing:
+
+> Copyright © 2021 [SVision Technologies LLC.](https://www.aivia-software.com/)
+> Copyright © 2021-2022 Leica Microsystems, Inc.
+>
+> Released under Creative Commons Attribution-NonCommercial 4.0 International Public License ([CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/))
+
+Below is the README content from the original repository at the time of accessing it.
+
 # 3D-RCAN
 
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
