@@ -1,12 +1,4 @@
 {
-<<<<<<< HEAD
-    "epochs": 5,
-    "steps_per_epoch": 1,
-    "num_residual_groups": 3,
-    "training_data_dir": {"raw":"Raw/",
-                          "gt":"GT/"},
-    "area_ratio_threshold": 0.0
-=======
     "epochs": 200,
     "steps_per_epoch": 100,
     "batch_size": 5,
@@ -16,6 +8,4 @@
     "num_residual_groups": 2,
     "training_data_dir": {"raw":"Training/Raw/",
                           "gt":"Training/GT/"}
-
->>>>>>> TF2
 }

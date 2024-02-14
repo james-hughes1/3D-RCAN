@@ -1,11 +1,5 @@
 /RCAN3D
 /data
-<<<<<<< HEAD
-*.pyc
-/Model
-/Training
-=======
 /model
 *.pyc
 *.ipynb
->>>>>>> TF2
