@@ -2,6 +2,7 @@ import argparse
 import numpy as np
 import pathlib
 import tifffile
+from itertools import product
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-i', '--input', type=str, required=True)
@@ -10,7 +11,7 @@ parser.add_argument(
     '-d', '--dimension', type=int, choices=[2, 3], required=True
 )
 parser.add_argument('-s', '--scale_factor', type=float, default=10.0)
-parser.add_argument('-f', '--fluorophores', type=int, default=1)
+parser.add_argument('-t', '--train_fraction', type=float, default=0.75)
 args = parser.parse_args()
 
 input_path = pathlib.Path(args.input)
@@ -19,18 +20,26 @@ output_path = pathlib.Path(args.output)
 if args.scale_factor <= 1.0:
     raise ValueError('Scale factor must exceed 1.0')
 
+if args.train_fraction < 0.0 or args.train_fraction > 1.0:
+    raise ValueError('Train fraction must be within interval [0,1].')
+
 if not output_path.exists():
     print('Creating output directory', output_path)
     output_path.mkdir(parents=True)
 
-output_gt_path = output_path.joinpath('GT')
-output_raw_path = output_path.joinpath('Raw')
-if not output_gt_path.exists():
-    print('Creating GT directory', output_gt_path)
-    output_gt_path.mkdir(parents=True)
-if not output_raw_path.exists():
-    print('Creating Raw directory', output_raw_path)
-    output_raw_path.mkdir(parents=True)
+output_train_gt_path = output_path.joinpath('Training', 'GT')
+output_train_raw_path = output_path.joinpath('Training', 'Raw')
+output_val_gt_path = output_path.joinpath('Validation', 'GT')
+output_val_raw_path = output_path.joinpath('Validation', 'Raw')
+for path in [
+    output_train_gt_path,
+    output_train_raw_path,
+    output_val_gt_path,
+    output_val_raw_path,
+]:
+    if not path.exists():
+        print('Creating GT directory', path)
+        path.mkdir(parents=True)
 
 if not output_path.is_dir():
     raise ValueError('Output path should be a directory')
@@ -43,25 +52,51 @@ else:
 rng = np.random.default_rng(seed=13022024)
 
 
-def save_image_pair(gt_img, output_path, name, img_idx):
+def save_image_pair(gt_img, train, name, img_idx):
     noised_img = np.uint16(rng.poisson(gt_img / args.scale_factor))
-    tifffile.imwrite(
-        f"{output_gt_path}/{name}_{img_idx}_gt.tif", gt_img, imagej=True
-    )
-    tifffile.imwrite(
-        f"{output_raw_path}/{name}_{img_idx}_noisy.tif",
-        noised_img,
-        imagej=True,
-    )
+    if train:
+        tifffile.imwrite(
+            f"{output_train_gt_path}/{name}_{img_idx}_gt.tif",
+            gt_img,
+            imagej=True,
+        )
+        tifffile.imwrite(
+            f"{output_train_raw_path}/{name}_{img_idx}_noisy.tif",
+            noised_img,
+            imagej=True,
+        )
+    else:
+        tifffile.imwrite(
+            f"{output_val_gt_path}/{name}_{img_idx}_gt.tif",
+            gt_img,
+            imagej=True,
+        )
+        tifffile.imwrite(
+            f"{output_val_raw_path}/{name}_{img_idx}_noisy.tif",
+            noised_img,
+            imagej=True,
+        )
 
 
-for img_file in data:
+n_img = len(data)
+n_acquisitions = tifffile.imread(data[0]).shape[0]
+
+img_idx_all = list(product(range(n_img), range(n_acquisitions)))
+rng.shuffle(img_idx_all)
+train_size = int(args.train_fraction * len(img_idx_all))
+img_idx_train = img_idx_all[:train_size]
+img_idx_test = img_idx_all[train_size:]
+
+for img_idx, img_file in enumerate(data):
     gt = tifffile.imread(img_file)
     if len(gt.shape) != args.dimension + 1:
         raise ValueError(
             'Mismatch between specified dimensions and true image dimensions'
         )
-    for i in range(gt.shape[0]):
+    for acq_idx in range(n_acquisitions):
         save_image_pair(
-            gt[i, ...], output_path, img_file.with_suffix('').name, i
+            gt[acq_idx, ...],
+            ((img_idx, acq_idx) in img_idx_train),
+            img_file.with_suffix('').name,
+            acq_idx,
         )
