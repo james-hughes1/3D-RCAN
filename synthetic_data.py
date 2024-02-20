@@ -12,6 +12,7 @@ parser.add_argument(
 )
 parser.add_argument('-s', '--scale_factor', type=float, default=10.0)
 parser.add_argument('-t', '--train_fraction', type=float, default=0.75)
+parser.add_argument('-c', '--channels', type=int, default=1)
 args = parser.parse_args()
 
 input_path = pathlib.Path(args.input)
@@ -26,30 +27,6 @@ if args.train_fraction < 0.0 or args.train_fraction > 1.0:
 if not output_path.exists():
     print('Creating output directory', output_path)
     output_path.mkdir(parents=True)
-
-output_train_gt_path = output_path.joinpath('Training', 'GT')
-output_train_raw_path = output_path.joinpath('Training', 'Raw')
-output_val_gt_path = output_path.joinpath('Validation', 'GT')
-output_val_raw_path = output_path.joinpath('Validation', 'Raw')
-for path in [
-    output_train_gt_path,
-    output_train_raw_path,
-    output_val_gt_path,
-    output_val_raw_path,
-]:
-    if not path.exists():
-        print('Creating GT directory', path)
-        path.mkdir(parents=True)
-
-if not output_path.is_dir():
-    raise ValueError('Output path should be a directory')
-
-if input_path.is_dir():
-    data = sorted(input_path.glob('*.tif'))
-else:
-    data = [input_path]
-
-rng = np.random.default_rng(seed=13022024)
 
 
 def save_image_pair(gt_img, train, name, img_idx):
@@ -78,25 +55,59 @@ def save_image_pair(gt_img, train, name, img_idx):
         )
 
 
-n_img = len(data)
-n_acquisitions = tifffile.imread(data[0]).shape[0]
+for channel_idx in range(args.channels):
+    output_train_gt_path = output_path.joinpath(
+        f'Channel_{channel_idx}', 'Training', 'GT'
+    )
+    output_train_raw_path = output_path.joinpath(
+        f'Channel_{channel_idx}', 'Training', 'Raw'
+    )
+    output_val_gt_path = output_path.joinpath(
+        f'Channel_{channel_idx}', 'Validation', 'GT'
+    )
+    output_val_raw_path = output_path.joinpath(
+        f'Channel_{channel_idx}', 'Validation', 'Raw'
+    )
+    for path in [
+        output_train_gt_path,
+        output_train_raw_path,
+        output_val_gt_path,
+        output_val_raw_path,
+    ]:
+        if not path.exists():
+            print('Creating GT directory', path)
+            path.mkdir(parents=True)
 
-img_idx_all = list(product(range(n_img), range(n_acquisitions)))
-rng.shuffle(img_idx_all)
-train_size = int(args.train_fraction * len(img_idx_all))
-img_idx_train = img_idx_all[:train_size]
-img_idx_test = img_idx_all[train_size:]
+    if not output_path.is_dir():
+        raise ValueError('Output path should be a directory')
 
-for img_idx, img_file in enumerate(data):
-    gt = tifffile.imread(img_file)
-    if len(gt.shape) != args.dimension + 1:
-        raise ValueError(
-            'Mismatch between specified dimensions and true image dimensions'
-        )
-    for acq_idx in range(n_acquisitions):
-        save_image_pair(
-            gt[acq_idx, ...],
-            ((img_idx, acq_idx) in img_idx_train),
-            img_file.with_suffix('').name,
-            acq_idx,
-        )
+    if input_path.is_dir():
+        data = sorted(input_path.glob('*.tif'))
+    else:
+        data = [input_path]
+
+    rng = np.random.default_rng(seed=13022024)
+
+    n_img = len(data)
+    n_acquisitions = tifffile.imread(data[0]).shape[0] // args.channels
+
+    img_idx_all = list(product(range(n_img), range(n_acquisitions)))
+    rng.shuffle(img_idx_all)
+    train_size = int(args.train_fraction * len(img_idx_all))
+    img_idx_train = img_idx_all[:train_size]
+    img_idx_test = img_idx_all[train_size:]
+
+    for img_idx, img_file in enumerate(data):
+        gt = tifffile.imread(img_file)
+        if len(gt.shape) != args.dimension + 1:
+            raise ValueError(
+                'Mismatch between specified dimensions and true image'
+                ' dimensions'
+            )
+        for acq_idx in range(n_acquisitions):
+            save_image_pair(
+                gt[n_acquisitions * channel_idx + acq_idx, ...],
+                ((img_idx, acq_idx) in img_idx_train),
+                img_file.with_suffix('').name,
+                acq_idx,
+            )
