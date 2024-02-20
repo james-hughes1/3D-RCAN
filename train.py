@@ -253,5 +253,6 @@ model.fit(
             save_best_only=True,
         ),
         TqdmCallback(),
+        tf.keras.callbacks.CSVLogger('./log.csv', separator=",", append=False),
     ],
 )

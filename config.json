@@ -1,11 +1,15 @@
 {
     "epochs": 200,
-    "steps_per_epoch": 100,
-    "batch_size": 5,
-    "intensity_threshold": 0.25,
-    "area_ratio_threshold": 0.50,
-    "input_shape": [12, 128, 128],
-    "num_residual_groups": 2,
-    "training_data_dir": {"raw":"Training/Raw/",
-                          "gt":"Training/GT/"}
+    "steps_per_epoch": 30,
+    "batch_size": 192,
+    "intensity_threshold": 0.0,
+    "area_ratio_threshold": 0.0,
+    "input_shape": [128, 128],
+    "num_channels": 32,
+    "num_residual_blocks": 3,
+    "num_residual_groups": 3,
+    "training_data_dir": {"raw":"virus_data/Channel_1/Training/Raw/",
+                          "gt":"virus_data/Channel_1/Training/GT/"},
+    "validation_data_dir": {"raw":"virus_data/Channel_1/Validation/Raw/",
+                            "gt":"virus_data/Channel_1/Validation/GT/"}
 }
